@@ -46,6 +46,18 @@ function getAPIManagers() {
   echo "${result}"
 }
 
+# Get the namespaces of all APICasts in the cluster
+function getAPICasts() {
+  local result=()
+
+  local namespaces=$(oc get APICast --all-namespaces -o jsonpath='{.items[*].metadata.namespace}')
+  for namespace in ${namespaces}; do
+    result+=" ${namespace} "
+  done
+
+  echo "${result}"
+}
+
 
 function main() {
   echo
@@ -54,6 +66,9 @@ function main() {
 
   local apiManagers="$(getAPIManagers)"
   resources="$(addResourcePrefix ns ${apiManagers})"
+
+  local apiCasts="$(getAPICasts)"
+  resources+="$(addResourcePrefix ns ${apiCasts})"
 
   for resource in ${resources}; do
     echo
