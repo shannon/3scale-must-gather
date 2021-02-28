@@ -15,6 +15,7 @@ Note that this command will only get data related to the 3scale part of the Open
 You will get a dump of:
 - The 3scale Operator namespaces (and its children objects)
 - The 3scale APICast Gateway Operator namespaces (and its children objects)
+- The APIcast configurations fetched from both the system-app and apicast pods
 
 In order to get data about other parts of the cluster (not specific to 3scale) you should
 run `oc adm must-gather` (without passing a custom image). Run `oc adm must-gather -h` to see more options.
