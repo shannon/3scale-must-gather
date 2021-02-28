@@ -76,6 +76,36 @@ function main() {
     oc adm inspect "--dest-dir=${BASE_COLLECTION_PATH}" ${resource}
   done
 
+  for apiManager in ${apiManagers}; do
+    echo
+    echo "Fetching APIcast configuration for ${apiManager} namespace"
+
+    local collectionPath=${BASE_COLLECTION_PATH}/apicast-configs/${apiManager}
+    mkdir -p ${collectionPath}
+
+    oc rsh -n ${apiManager} dc/apicast-staging /bin/bash -c "curl -X GET -H 'Accept: application/json' -k \${THREESCALE_PORTAL_ENDPOINT}/production.json" > ${collectionPath}/from-system-production.json
+    oc rsh -n ${apiManager} dc/apicast-staging /bin/bash -c "curl -X GET -H 'Accept: application/json' -k \${THREESCALE_PORTAL_ENDPOINT}/staging.json" > ${collectionPath}/from-system-staging.json
+
+    # TODO: Check if APICAST_MANAGEMENT_API=debug before attempting this
+    oc rsh -n ${apiManager} dc/apicast-staging /bin/bash -c "curl -X GET -H 'Accept: application/json' http://localhost:8090/config" > ${collectionPath}/from-apicast-staging.json
+    oc rsh -n ${apiManager} dc/apicast-production /bin/bash -c "curl -X GET -H 'Accept: application/json' http://localhost:8090/config" > ${collectionPath}/from-apicast-production.json
+    
+  done
+
+  for apiCast in ${apiCasts}; do
+    echo
+    echo "Fetching APIcast configuration for ${apicast} namespace"
+
+    local collectionPath=${BASE_COLLECTION_PATH}/apicast-configs/${apiCast}
+    mkdir -p ${collectionPath}
+
+    oc rsh -n ${apiCast} deployment/apicast-apicast /bin/bash -c "curl -X GET -H 'Accept: application/json' -k \${THREESCALE_PORTAL_ENDPOINT}/production.json" > ${collectionPath}/from-system-production.json
+    oc rsh -n ${apiCast} deployment/apicast-apicast /bin/bash -c "curl -X GET -H 'Accept: application/json' -k \${THREESCALE_PORTAL_ENDPOINT}/staging.json" > ${collectionPath}/from-system-staging.json
+    
+    # TODO: Check if APICAST_MANAGEMENT_API=debug before attempting this
+    oc rsh -n ${apiCast} deployment/apicast-apicast /bin/bash -c "curl -X GET -H 'Accept: application/json' http://localhost:8090/config" > ${collectionPath}/from-apicast.json
+  done
+  
   echo
   echo
   echo "Done"
