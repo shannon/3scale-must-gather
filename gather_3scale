@@ -1,0 +1,70 @@
+#!/bin/bash
+
+# Copyright 2021 Red Hat, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+BASE_COLLECTION_PATH="/must-gather"
+
+# Auxiliary function that adds a k8s prefix to a resource
+# $1: The prefix - e.g. "ns" or "pod"
+# $2...$N: Resources
+# Returns: The list of resources with the prefix prepended on them
+#
+# Example: addResourcePrefix pod a b c  => Returns: pod/a pod/b pod/c
+function addResourcePrefix() {
+  local result=""
+  local prefix="${1}"
+  shift
+
+  for ns in $*; do
+    result+=" ${prefix}/${ns} "
+  done
+
+  echo "${result}"
+}
+
+# Get the namespaces of all API Managers in the cluster
+function getAPIManagers() {
+  local result=()
+
+  local namespaces=$(oc get APIManager --all-namespaces -o jsonpath='{.items[*].metadata.namespace}')
+  for namespace in ${namespaces}; do
+    result+=" ${namespace} "
+  done
+
+  echo "${result}"
+}
+
+
+function main() {
+  echo
+  echo "Executing 3scale gather script"
+  echo
+
+  local apiManagers="$(getAPIManagers)"
+  resources="$(addResourcePrefix ns ${apiManagers})"
+
+  for resource in ${resources}; do
+    echo
+    echo "Dumping resource ${resource}..."
+    oc adm inspect "--dest-dir=${BASE_COLLECTION_PATH}" ${resource}
+  done
+
+  echo
+  echo
+  echo "Done"
+  echo
+}
+
+main
