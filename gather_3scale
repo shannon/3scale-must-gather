@@ -28,14 +28,20 @@ function addResourcePrefix() {
   shift
 
   for ns in $*; do
-    result+=" ${prefix}/${ns} "
+    result+="${prefix}/${ns} "
   done
 
   echo "${result}"
 }
 
+# Function that sorts and reduces a list to unique values
+function unique() {
+  local list="${1}"
+  echo "${list[@]}" | tr ' ' '\n' | sort -u | tr '\n' ' '
+}
+
 # Get the namespaces of all API Managers in the cluster
-function getAPIManagers() {
+function getAPIManagerNamespaces() {
   local result=()
 
   local namespaces=$(oc get APIManager --all-namespaces -o jsonpath='{.items[*].metadata.namespace}')
@@ -43,32 +49,106 @@ function getAPIManagers() {
     result+=" ${namespace} "
   done
 
-  echo "${result}"
+  echo "$(unique ${result})"
 }
 
-# Get the namespaces of all APICasts in the cluster
-function getAPICasts() {
+# Get the namespaces of all APIcasts in the cluster
+function getAPIcastNamespaces() {
   local result=()
 
-  local namespaces=$(oc get APICast --all-namespaces -o jsonpath='{.items[*].metadata.namespace}')
+  local namespaces=$(oc get APIcast --all-namespaces -o jsonpath='{.items[*].metadata.namespace}')
   for namespace in ${namespaces}; do
     result+=" ${namespace} "
+  done
+
+  echo "$(unique ${result})"
+}
+
+# Get the APIcast deployments for a given namespace
+function getAPIcastDeployments() {
+  local namespace="${1}"
+  local result=()
+
+  local names=$(oc get deployment -n ${namespace} -l app=apicast,threescale_component=apicast -o jsonpath='{.items[*].metadata.name}')
+  for name in ${names}; do
+    result+=" ${name} "
   done
 
   echo "${result}"
 }
 
+function getNodes() {
+  local result=()
+
+  local names=$(oc get node -o jsonpath='{.items[*].metadata.name}')
+  for name in ${names}; do
+    result+=" ${name} "
+  done
+
+  echo "${result}"
+}
+
+# Function that fetches the APIcast configuration from a given resource
+# $1: The namespace the resource is in
+# $2: The resources name in type/name format (i.e. dc/apicast-staging)
+# $3: The endpoint to call from the resource
+# $4: The filename to write the output to
+#
+# Example: 
+# 
+# getAPIcastConfig 3scale dc/apicast-staging "\${THREESCALE_PORTAL_ENDPOINT}/production.json" apicast-production-portal.json
+# 
+# fetches config from the THREESCALE_PORTAL_ENDPOINT/production.json from inside of dc/apicast-staging and writes to apicast-production-portal.json
+function getAPIcastConfig() {
+  local namespace="${1}" # 
+  local resource="${2}"
+  local endpoint="${3}"
+  local filename="${4}"
+  local command="curl -X GET -H 'Accept: application/json' -k ${endpoint}"
+  local collectionPath=${BASE_COLLECTION_PATH}/apicast-configs/${namespace}
+
+  mkdir -p ${collectionPath}
+  oc rsh -n ${namespace} ${resource} /bin/bash -c "${command}" > ${collectionPath}/${filename}
+}
+
+# Gets an environment variable from a resource
+function getEnvironmentVariable() {
+  local namespace=${1}
+  local resource=${2}
+  local variable=${3}
+
+  oc rsh -T -n "${namespace}" "${resource}" /bin/bash -c "echo \${${variable}}"
+}
+
+# Gets the config portal endpoint based on the THREESCALE_PORTAL_ENDPOINT and THREESCALE_DEPLOYMENT_ENV values
+function getConfigPortalEndpoint() {
+  local namespace=${1}
+  local resource=${2}
+
+  local endpoint=$(getEnvironmentVariable ${namespace} ${resource} "THREESCALE_PORTAL_ENDPOINT")
+  local environment=$(getEnvironmentVariable ${namespace} ${resource} "THREESCALE_DEPLOYMENT_ENV:-production")
+  
+  if  [[ "$endpoint" =~ .*"/master/api/proxy/configs"$ ]] ;
+  then
+    echo "${endpoint}/${environment}.json"
+  else
+    echo "${endpoint}/admin/api/services.json"
+  fi
+}
 
 function main() {
   echo
   echo "Executing 3scale gather script"
   echo
 
-  local apiManagers="$(getAPIManagers)"
-  resources="$(addResourcePrefix ns ${apiManagers})"
+  local apiManagerNamespaces=$(getAPIManagerNamespaces)
+  local apiCastNamespaces=$(getAPIcastNamespaces)
+  local nodes=$(getNodes)
 
-  local apiCasts="$(getAPICasts)"
-  resources+="$(addResourcePrefix ns ${apiCasts})"
+  resources=$(addResourcePrefix ns "${apiManagerNamespaces}")
+  resources+=$(addResourcePrefix ns "${apiCastNamespaces}")
+  resources+=$(addResourcePrefix node "${nodes}")
+  resources=$(unique "${resources}")
 
   for resource in ${resources}; do
     echo
@@ -76,34 +156,28 @@ function main() {
     oc adm inspect "--dest-dir=${BASE_COLLECTION_PATH}" ${resource}
   done
 
-  for apiManager in ${apiManagers}; do
+  for namespace in ${apiManagerNamespaces}; do
     echo
-    echo "Fetching APIcast configuration for ${apiManager} namespace"
+    echo "Fetching APIcast configurations for ${namespace} namespace"
 
-    local collectionPath=${BASE_COLLECTION_PATH}/apicast-configs/${apiManager}
-    mkdir -p ${collectionPath}
-
-    oc rsh -n ${apiManager} dc/apicast-staging /bin/bash -c "curl -X GET -H 'Accept: application/json' -k \${THREESCALE_PORTAL_ENDPOINT}/production.json" > ${collectionPath}/from-system-production.json
-    oc rsh -n ${apiManager} dc/apicast-staging /bin/bash -c "curl -X GET -H 'Accept: application/json' -k \${THREESCALE_PORTAL_ENDPOINT}/staging.json" > ${collectionPath}/from-system-staging.json
-
-    # TODO: Check if APICAST_MANAGEMENT_API=debug before attempting this
-    oc rsh -n ${apiManager} dc/apicast-staging /bin/bash -c "curl -X GET -H 'Accept: application/json' http://localhost:8090/config" > ${collectionPath}/from-apicast-staging.json
-    oc rsh -n ${apiManager} dc/apicast-production /bin/bash -c "curl -X GET -H 'Accept: application/json' http://localhost:8090/config" > ${collectionPath}/from-apicast-production.json
+    getAPIcastConfig ${namespace} dc/apicast-staging "\${THREESCALE_PORTAL_ENDPOINT}/staging.json" apicast-staging-portal.json
+    getAPIcastConfig ${namespace} dc/apicast-staging "http://localhost:8090/config" apicast-staging.json
     
+    getAPIcastConfig ${namespace} dc/apicast-production "\${THREESCALE_PORTAL_ENDPOINT}/production.json" apicast-production-portal.json
+    getAPIcastConfig ${namespace} dc/apicast-production "http://localhost:8090/config" apicast-production.json
   done
 
-  for apiCast in ${apiCasts}; do
+  for namespace in ${apiCastNamespaces}; do
     echo
-    echo "Fetching APIcast configuration for ${apicast} namespace"
+    echo "Fetching APIcast configurations for ${namespace} namespace"
 
-    local collectionPath=${BASE_COLLECTION_PATH}/apicast-configs/${apiCast}
-    mkdir -p ${collectionPath}
+    local deployments="$(getAPIcastDeployments ${namespace})"
+    for deployment in ${deployments}; do
+      local endpoint=$(getConfigPortalEndpoint ${namespace} "deployment/${deployment}")
 
-    oc rsh -n ${apiCast} deployment/apicast-apicast /bin/bash -c "curl -X GET -H 'Accept: application/json' -k \${THREESCALE_PORTAL_ENDPOINT}/production.json" > ${collectionPath}/from-system-production.json
-    oc rsh -n ${apiCast} deployment/apicast-apicast /bin/bash -c "curl -X GET -H 'Accept: application/json' -k \${THREESCALE_PORTAL_ENDPOINT}/staging.json" > ${collectionPath}/from-system-staging.json
-    
-    # TODO: Check if APICAST_MANAGEMENT_API=debug before attempting this
-    oc rsh -n ${apiCast} deployment/apicast-apicast /bin/bash -c "curl -X GET -H 'Accept: application/json' http://localhost:8090/config" > ${collectionPath}/from-apicast.json
+      getAPIcastConfig ${namespace} "deployment/${deployment}" "${endpoint}" ${deployment}-portal.json
+      getAPIcastConfig ${namespace} "deployment/${deployment}" "http://localhost:8090/config" ${deployment}.json
+    done
   done
   
   echo
