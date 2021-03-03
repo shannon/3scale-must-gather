@@ -6,7 +6,7 @@ that expands its capabilities to gather 3scale information.
 
 ### Usage
 ```sh
-oc adm must-gather --image=quay.io/spoole/3scale-must-gather
+oc adm must-gather --image=quay.io/3scale/must-gather
 ```
 
 The command above will create a local directory with a dump of the 3scale state.
@@ -14,9 +14,14 @@ Note that this command will only get data related to the 3scale part of the Open
 
 You will get a dump of:
 - The 3scale Operator namespaces (and its children objects)
+  - i.e. Output from command `oc adm inspect ns/<namespace>` for all namespaces that contain a APIManager resource
 - The 3scale APICast Gateway Operator namespaces (and its children objects)
+  - i.e. Output from command `oc adm inspect ns/<namespace>` for all namespaces that contain a APIcast resource
+- All 3scale APIManager, APIManagerBackup, APIManagerRestore, and APIcast custom resources
+  - i.e. Output from command `oc adm inspect --all-namespaces <resource>` for all 3scale resources above
+- All of the information for the Openshift Nodes in the cluster 
+  - i.e. `oc adm inspect node/<node-name>`
 - The APIcast configurations fetched from both the Admin Portal and the APIcast gateway
-- All of the information for the Openshift Nodes in the cluster (i.e. oc adm inspect node <node-name>)
 
 In order to get data about other parts of the cluster (not specific to 3scale) you should
 run `oc adm must-gather` (without passing a custom image). Run `oc adm must-gather -h` to see more options.
@@ -50,4 +55,25 @@ You can build the image locally using the Dockerfile included.
 - Test the image
   ```
   oc adm must-gather --image-stream=<namespace>/3scale-must-gather
+  ```
+
+### Publishing
+
+- Build and tag the image for quay.io
+  ```
+  docker build -t 3scale-must-gather .
+  ```
+- Tag image for quay.io
+  ```
+  docker tag 3scale-must-gather quay.io/3scale/must-gather:latest
+  docker tag 3scale-must-gather quay.io/3scale/must-gather:<version>
+  ```
+- Login to the quay.io registry
+  ```
+  docker login -u `<username` -p `<token>` quay.io
+  ```
+- Push the image to the quay.io registry
+  ```
+  docker push quay.io/3scale/must-gather:latest
+  docker push quay.io/3scale/must-gather:<version>
   ```

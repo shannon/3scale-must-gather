@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+# This file was copied from the [openshift must-gather repo](https://github.com/openshift/must-gather/blob/c2a1ef4/collection-scripts/version).
+# This function is duplicated in case we want to change this logic later 
+# and it allows us to run './gather_3scale' locally without having to build the image
+
+function version() {
+  # get version from image
+  version=$( \
+    oc status | grep '^pod' | \
+    sed -n -r -e 's/.*([[:digit:]]+\.[[:digit:]]+(:?\.[[:digit:]])?(:?-[^@]+)?).*/\1/p' \
+  )
+
+  # if version not found, fallback to imageID
+  [ -z "${version}" ] && version=$(oc status | grep '^pod.*runs' | sed -r -e 's/^pod.*runs //')
+
+  # if version still not found, use Unknown
+  [ -z "${version}" ] && version="Unknown"
+
+  echo ${version}
+}
