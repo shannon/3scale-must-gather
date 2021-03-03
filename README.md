@@ -68,6 +68,7 @@ You can build the image locally using the Dockerfile included.
   docker tag 3scale-must-gather quay.io/3scale/must-gather:latest
   docker tag 3scale-must-gather quay.io/3scale/must-gather:<version>
   ```
+  *Version should only include major.minor (i.e. 2.9)*
 - Login to the quay.io registry
   ```
   docker login -u `<username` -p `<token>` quay.io
