@@ -41,16 +41,16 @@ You can build the image locally using the Dockerfile included.
   ```
 - Tag image with internal registry domain
   ```
-  docker tag 3scale-must-gather <opeshift-registry-domain>/<namespace>/3scale-must-gather
+  docker tag 3scale-must-gather <openshift-registry-domain>/<namespace>/3scale-must-gather
   ```
 - Login to the openshift internal registry
   ```
-  docker login -u `oc whoami` -p `oc whoami -t` <opeshift-registry-domain>
+  docker login -u `oc whoami` -p `oc whoami -t` <openshift-registry-domain>
   ```
   *If using crc or any local environment where `oc whoami` returns `kube:admin`, you will need to change the `-u` option to `kubeadmin`.*
 - Push the image to the internal registry
   ```
-  docker push <opeshift-registry-domain>/<namespace>/3scale-must-gather
+  docker push <openshift-registry-domain>/<namespace>/3scale-must-gather
   ```
 - Test the image
   ```
