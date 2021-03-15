@@ -1,8 +1,13 @@
-3scale must-gather
+3scale-must-gather
 =================
 
-`must-gather` is a tool built on top of [OpenShift must-gather](https://github.com/openshift/must-gather)
+`3scale-must-gather` is a tool built on top of [OpenShift must-gather](https://github.com/openshift/must-gather)
 that expands its capabilities to gather 3scale information.
+
+`3scale-must-gather` also borrows logic and structure from the following similar images:
+
+- [maistra/istio-must-gather](https://github.com/maistra/istio-must-gather)
+- [kubevirt/must-gather](https://github.com/kubevirt/must-gather)
 
 ### Usage
 ```sh

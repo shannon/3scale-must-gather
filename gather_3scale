@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This file is derived from the following:
+# https://github.com/maistra/istio-must-gather/blob/maistra-2.1/gather_istio
+# https://github.com/openshift/must-gather/blob/release-4.9/collection-scripts/gather
+
 # generate /must-gather/version file
 . version
 echo "3scale/must-gather" > /must-gather/version
